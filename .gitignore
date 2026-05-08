@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
+.firecrawl/
 dist/
 *.tgz
 skills/bmad-story-automator/build/

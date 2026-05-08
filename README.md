@@ -12,6 +12,42 @@ This is the Python port of [`bma-d/bmad-story-automator-go`](https://github.com/
 
 The root `skills/` folder follows the Claude skill convention: each skill is a directory with its own `SKILL.md`. You can copy either skill folder directly into `.claude/skills/`. The repo also includes `.claude-plugin/plugin.json`, so the same root layout can be loaded as a Claude Code plugin with `claude --plugin-dir .`.
 
+## Claude Plugin Layout
+
+This repo follows the Anthropic Claude Code plugin layout:
+
+```text
+.
+├── .claude-plugin/
+│   ├── plugin.json
+│   └── marketplace.json
+├── skills/
+│   ├── bmad-story-automator/
+│   │   └── SKILL.md
+│   └── bmad-story-automator-review/
+│       └── SKILL.md
+├── bin/
+└── README.md
+```
+
+- `.claude-plugin/plugin.json` is the plugin manifest.
+- `.claude-plugin/marketplace.json` is the marketplace catalog entry.
+- `skills/` stays at the plugin root, not inside `.claude-plugin/`.
+- `bin/` stays at the plugin root so plugin executables can be added to Claude Code's Bash path.
+
+Local plugin test:
+
+```bash
+claude --plugin-dir .
+```
+
+Local marketplace test:
+
+```text
+/plugin marketplace add .
+/plugin install bmad-story-automator@bmad-plugins
+```
+
 ## Quickstart
 
 Install into the target BMAD project:
