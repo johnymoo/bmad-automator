@@ -87,8 +87,7 @@ class StateBuildUnicodeTests(_FixtureMixin, unittest.TestCase):
         config["customInstructions"] = "请使用中文编写代码注释"
         state_file = self._build_state(config)
         text = state_file.read_text(encoding="utf-8")
-        self.assertIn("customInstructions:", text)
-        self.assertNotIn("customInstructions: \"\"", text)
+        self.assertIn("请使用中文编写代码注释", text)
 
     def test_custom_instructions_with_mixed_unicode(self) -> None:
         config = self._default_config()
@@ -96,6 +95,7 @@ class StateBuildUnicodeTests(_FixtureMixin, unittest.TestCase):
         state_file = self._build_state(config)
         text = state_file.read_text(encoding="utf-8")
         self.assertIn("customInstructions:", text)
+        self.assertIn("日本語コメント", text)
 
     def test_replacement_value_with_chinese_epic_name(self) -> None:
         config = self._default_config()
@@ -109,7 +109,7 @@ class StateBuildUnicodeTests(_FixtureMixin, unittest.TestCase):
         config["epicName"] = r"path\to\file"
         state_file = self._build_state(config)
         text = state_file.read_text(encoding="utf-8")
-        self.assertIn("path", text)
+        self.assertIn(r"\to", text)
 
 
 class StateUpdateUnicodeTests(_FixtureMixin, unittest.TestCase):
