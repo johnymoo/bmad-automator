@@ -76,6 +76,37 @@ cp -a skills/bmad-story-automator /absolute/path/to/project/.claude/skills/
 cp -a skills/bmad-story-automator-review /absolute/path/to/project/.claude/skills/
 ```
 
+## BMAD Method Install Channels
+
+If you install Automator through the BMAD Method official module code `baut`, choose the channel explicitly.
+Run these from the target BMAD project root, or add `--directory /absolute/path/to/your-bmad-project`.
+
+Stable install, using the latest pure-semver tag:
+
+```bash
+npx bmad-method install --modules baut --all-stable --tools claude-code --yes
+```
+
+Stable pin or rollback to the current stable tag for this preview cycle:
+
+```bash
+npx bmad-method install --modules baut --pin baut=v1.14.2 --tools claude-code --yes
+```
+
+Codex preview. Do not run this until the remote preview tag is published:
+
+```bash
+npx bmad-method install --modules baut --pin baut=v1.15.0-next.0 --tools codex --yes
+```
+
+Branch preview. Do not run this until the remote preview branch is published:
+
+```bash
+npx bmad-method install --custom-source https://github.com/bmad-code-org/bmad-automator@next/codex-runtime-support --tools codex --yes
+```
+
+Current caveat: the official registry sets `baut` to `default_channel: next`, so unqualified `--modules baut` and `--next baut` resolve to `main` HEAD. They are not stable installs and, before the preview work merges to `main`, they are not the pre-merge Codex preview. Treat the preview pin and branch commands as post-publication commands only.
+
 ## Expectations
 
 - This is an orchestrator, not a correctness guarantee. Bad planning artifacts still produce bad implementation runs.

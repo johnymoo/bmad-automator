@@ -2,6 +2,58 @@
 
 This doc explains what `npx bmad-story-automator` installs, what it requires, and how it handles migration from older installs.
 
+## BMAD Method Channels
+
+Automator is also available through the BMAD Method official module code `baut`. Because the official registry currently sets `baut` to `default_channel: next`, channel selection must be explicit:
+
+- `--modules baut --all-stable` resolves to the latest pure-semver stable tag.
+- `--pin baut=v1.14.2` resolves to the current stable tag for this preview cycle and is the safest rollback path.
+- `--pin baut=v1.15.0-next.0` resolves to the reproducible Codex preview after the remote tag is published.
+- `--custom-source https://github.com/bmad-code-org/bmad-automator@next/codex-runtime-support` resolves to the branch preview after the remote branch is published.
+- Unqualified `--modules baut` and `--next baut` resolve to `main` HEAD while `default_channel: next` remains. They are not stable installs and are not the pre-merge PR preview.
+
+Run these commands from the target BMAD project root, or add `--directory /absolute/path/to/your-bmad-project`.
+
+Stable install:
+
+```bash
+npx bmad-method install --modules baut --all-stable --tools claude-code --yes
+```
+
+Stable pin:
+
+```bash
+npx bmad-method install --modules baut --pin baut=v1.14.2 --tools claude-code --yes
+```
+
+Codex preview install. Do not run this until `v1.15.0-next.0` is pushed to the remote:
+
+```bash
+npx bmad-method install --modules baut --pin baut=v1.15.0-next.0 --tools codex --yes
+```
+
+Branch preview install. Do not run this until `next/codex-runtime-support` is pushed to the remote:
+
+```bash
+npx bmad-method install --custom-source https://github.com/bmad-code-org/bmad-automator@next/codex-runtime-support --tools codex --yes
+```
+
+Rollback from preview or branch testing:
+
+```bash
+npx bmad-method install --modules baut --pin baut=v1.14.2 --tools claude-code --yes
+```
+
+or:
+
+```bash
+npx bmad-method install --modules baut --all-stable --tools claude-code --yes
+```
+
+The preview tag and preview branch are local-only until remote publication happens. Do not give testers the preview pin or custom-source branch commands as working remote commands before that publication. If custom-source discovery asks which plugin to install after reading the branch, choose `bmad-automator`.
+
+The BMAD Method commands above install through `bmad-method` for the requested `--tools` target. The sections below describe the standalone `npx bmad-story-automator` installer and its multi-root copying behavior.
+
 ## Installer Flow
 
 ```mermaid
