@@ -266,6 +266,9 @@ def _is_story_automator_stop_hook_command(value: str) -> bool:
         return False
     if not parts:
         return False
+    parts = _strip_env_prefix(parts)
+    if not parts:
+        return False
     command_name = Path(parts[0]).name
     if command_name == "story-automator":
         return len(parts) > 1 and parts[1] == "stop-hook"
@@ -276,6 +279,28 @@ def _is_story_automator_stop_hook_command(value: str) -> bool:
         and parts[2] == "story_automator"
         and parts[3] == "stop-hook"
     )
+
+
+def _strip_env_prefix(parts: list[str]) -> list[str]:
+    if Path(parts[0]).name != "env":
+        return parts
+    idx = 1
+    while idx < len(parts):
+        part = parts[idx]
+        if part in {"-i", "-0"}:
+            idx += 1
+            continue
+        if part in {"-u", "--unset"} and idx + 1 < len(parts):
+            idx += 2
+            continue
+        if part.startswith("--unset="):
+            idx += 1
+            continue
+        if "=" in part and not part.startswith("-"):
+            idx += 1
+            continue
+        break
+    return parts[idx:]
 
 
 def _is_python_command(command_name: str) -> bool:

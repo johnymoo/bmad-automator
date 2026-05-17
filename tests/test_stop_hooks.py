@@ -235,6 +235,44 @@ class StopHookTests(unittest.TestCase):
         self.assertEqual(new_hook["timeout"], 10)
         self.assertEqual(new_hook["statusMessage"], "Checking story automator state")
 
+    def test_ensure_stop_hook_codex_normalizes_env_wrapped_story_hook(self) -> None:
+        self._install_bundle(".agents")
+        codex_dir = self.project_root / ".codex"
+        codex_dir.mkdir(parents=True, exist_ok=True)
+        (codex_dir / "config.toml").write_text("[features]\ncodex_hooks = true\n", encoding="utf-8")
+        (codex_dir / "hooks.json").write_text(
+            json.dumps(
+                {
+                    "hooks": {
+                        "Stop": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "env PROJECT_ROOT=/old/root /old/install/story-automator stop-hook",
+                                        "timeout": 1,
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        payload = self._run_ensure_stop_hook("codex")
+
+        self.assertTrue(payload["changed"])
+        hooks = json.loads((codex_dir / "hooks.json").read_text(encoding="utf-8"))
+        stop_hooks = hooks["hooks"]["Stop"]
+        self.assertEqual(len(stop_hooks), 1)
+        hook = stop_hooks[0]["hooks"][0]
+        self.assertEqual(shlex.split(hook["command"])[-1], "stop-hook")
+        self.assertEqual(hook["timeout"], 10)
+
     def test_ensure_stop_hook_claude_still_uses_settings_json(self) -> None:
         self._install_bundle(".claude")
 
@@ -258,7 +296,10 @@ class StopHookTests(unittest.TestCase):
 
         settings = json.loads((self.project_root / ".claude" / "settings.json").read_text(encoding="utf-8"))
         command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
-        self.assertEqual(shlex.split(command), ["env", f"PROJECT_ROOT={self.project_root}", str(script), "stop-hook"])
+        self.assertEqual(
+            shlex.split(command),
+            ["env", f"PROJECT_ROOT={self.project_root.resolve()}", str(script.resolve()), "stop-hook"],
+        )
 
     def test_ensure_stop_hook_claude_ignores_ai_agent_override(self) -> None:
         self._install_bundle(".claude")

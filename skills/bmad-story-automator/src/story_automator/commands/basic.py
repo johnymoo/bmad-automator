@@ -40,7 +40,7 @@ def _stop_hook_command(command: str, project_root: Path) -> str:
     ]
     for candidate in candidates:
         if candidate and candidate.exists() and os.access(candidate, os.X_OK):
-            command_parts[0] = str(candidate)
+            command_parts[0] = str(candidate.resolve())
             return shlex.join(["env", f"PROJECT_ROOT={project_root}", *command_parts])
     return shlex.join(["env", f"PROJECT_ROOT={project_root}", shutil.which("python3") or "python3", "-m", "story_automator", *command_parts[1:]])
 
