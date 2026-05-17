@@ -286,7 +286,7 @@ def _state_update(args: list[str]) -> int:
     while idx < len(args):
         if args[idx] == "--set" and idx + 1 < len(args):
             key, value = args[idx + 1].split("=", 1)
-            replaced, count = re.subn(rf"(?m)^{re.escape(key)}:.*$", f"{key}: {value}", text)
+            replaced, count = re.subn(rf"(?m)^{re.escape(key)}:.*$", lambda m, k=key, v=value: f"{k}: {v}", text)
             if count:
                 text = replaced
                 updated.append(key)
