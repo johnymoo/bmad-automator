@@ -96,7 +96,7 @@ npx bmad-method install --modules baut --pin baut=v1.14.2 --tools claude-code --
 Codex preview. Do not run this until the remote preview tag is published:
 
 ```bash
-npx bmad-method install --modules baut --pin baut=v1.15.0-next.0 --tools codex --yes
+npx bmad-method install --modules baut --pin baut=v1.15.0-next.1 --tools codex --yes
 ```
 
 Branch preview. Do not run this until the remote preview branch is published:
