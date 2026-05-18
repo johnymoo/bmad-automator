@@ -99,6 +99,9 @@ def cmd_build_state_doc(args: list[str]) -> int:
             f"  defaultPrimary: {json.dumps(default_primary)}",
             f"  defaultFallback: {json.dumps(default_fallback)}",
         ]
+        default_model = agent_config.get("defaultModel")
+        if isinstance(default_model, str) and default_model.strip():
+            lines.append(f"  defaultModel: {json.dumps(default_model.strip())}")
         if isinstance(per_task, dict) and per_task:
             lines.append("  perTask:")
             for task in sorted(per_task):
@@ -111,6 +114,10 @@ def cmd_build_state_doc(args: list[str]) -> int:
                 if "fallback" in entry:
                     value = entry["fallback"]
                     lines.append(f"      fallback: {'false' if value is False else json.dumps(value)}")
+                if "model" in entry:
+                    model_value = entry["model"]
+                    if isinstance(model_value, str) and model_value.strip():
+                        lines.append(f"      model: {json.dumps(model_value.strip())}")
         complexity_overrides = agent_config.get("complexityOverrides", {})
         if isinstance(complexity_overrides, dict) and complexity_overrides:
             lines.append("  complexityOverrides:")
@@ -129,6 +136,10 @@ def cmd_build_state_doc(args: list[str]) -> int:
                     if "fallback" in entry:
                         value = entry["fallback"]
                         lines.append(f"        fallback: {'false' if value is False else json.dumps(value)}")
+                    if "model" in entry:
+                        model_value = entry["model"]
+                        if isinstance(model_value, str) and model_value.strip():
+                            lines.append(f"        model: {json.dumps(model_value.strip())}")
         block = "\n".join(lines) + "\n"
         text = re.sub(r"(?m)^agentConfig:\n(?:(?:\s{2}.*\n)*)", block, text)
     for key, value in replacements.items():

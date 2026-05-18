@@ -15,12 +15,14 @@ from .runtime_layout import runtime_provider
 class AgentTaskConfig:
     primary: str = ""
     fallback: Any = None
+    model: str = ""
 
 
 @dataclass
 class AgentConfigResolved:
     default_primary: str = "auto"
     default_fallback: str = "false"
+    default_model: str = ""
     per_task: dict[str, AgentTaskConfig] = field(default_factory=dict)
     complexity_overrides: dict[str, dict[str, AgentTaskConfig]] = field(default_factory=dict)
 
@@ -52,6 +54,7 @@ def parse_agent_config_json(raw: str) -> AgentConfigResolved:
         fallback_raw = False
     normalized_fallback = normalize_fallback_value(fallback_raw)
     config.default_fallback = normalized_fallback or "false"
+    config.default_model = _normalize_model(data.get("defaultModel"))
     config.per_task = _parse_task_map(data.get("perTask"))
     retro_task = _parse_task_entry(data.get("retro"))
     if retro_task is not None:
@@ -81,7 +84,22 @@ def _parse_task_map(raw: Any) -> dict[str, AgentTaskConfig]:
 def _parse_task_entry(raw: Any) -> AgentTaskConfig | None:
     if not isinstance(raw, dict):
         return None
-    return AgentTaskConfig(primary=str(raw.get("primary", "")), fallback=raw.get("fallback"))
+    return AgentTaskConfig(
+        primary=str(raw.get("primary", "")),
+        fallback=raw.get("fallback"),
+        model=_normalize_model(raw.get("model")),
+    )
+
+
+def _normalize_model(raw: Any) -> str:
+    if raw is None or raw is False:
+        return ""
+    value = str(raw).strip()
+    if not value:
+        return ""
+    if value.lower() in {"false", "none", "null", "auto", "default"}:
+        return ""
+    return value
 
 
 def normalize_fallback_value(raw: Any) -> str:
@@ -95,15 +113,18 @@ def normalize_fallback_value(raw: Any) -> str:
     return ""
 
 
-def resolve_agent_for_task(config: AgentConfigResolved, complexity: str, task: str) -> tuple[str, str]:
+def resolve_agent_for_task(config: AgentConfigResolved, complexity: str, task: str) -> tuple[str, str, str]:
     primary = config.default_primary or "auto"
     fallback = config.default_fallback or "false"
+    model = config.default_model or ""
     per_task = config.per_task.get(task)
     if per_task:
         if per_task.primary:
             primary = per_task.primary
         if per_task.fallback is not None:
             fallback = normalize_fallback_value(per_task.fallback)
+        if per_task.model:
+            model = per_task.model
     by_level = config.complexity_overrides.get(complexity, {})
     override = by_level.get(task)
     if override:
@@ -111,7 +132,9 @@ def resolve_agent_for_task(config: AgentConfigResolved, complexity: str, task: s
             primary = override.primary
         if override.fallback is not None:
             fallback = normalize_fallback_value(override.fallback)
-    return _resolve_primary_agent(primary), _resolve_fallback_agent(fallback)
+        if override.model:
+            model = override.model
+    return _resolve_primary_agent(primary), _resolve_fallback_agent(fallback), model
 
 
 def _resolve_primary_agent(raw: Any) -> str:
@@ -147,8 +170,14 @@ def build_agents_file(state_file: str | Path, complexity_file: str | Path, outpu
         level = str(((story.get("complexity") or {}).get("level")) or "medium").strip().lower() or "medium"
         tasks = {}
         for task in ("create", "dev", "auto", "review"):
-            primary, fallback = resolve_agent_for_task(config, level, task)
-            tasks[task] = {"primary": primary, "fallback": False if fallback == "false" else fallback}
+            primary, fallback, model = resolve_agent_for_task(config, level, task)
+            entry: dict[str, Any] = {
+                "primary": primary,
+                "fallback": False if fallback == "false" else fallback,
+            }
+            if model:
+                entry["model"] = model
+            tasks[task] = entry
         stories.append(
             {
                 "storyId": story.get("storyId"),
@@ -193,6 +222,7 @@ def resolve_agents(agents_file: str | Path, story_id: str, task: str) -> dict[st
             "task": task,
             "primary": selection.get("primary"),
             "fallback": fallback,
+            "model": _normalize_model(selection.get("model")),
             "complexity": story.get("complexity"),
         }
     return {"ok": False, "error": "story_not_found"}
