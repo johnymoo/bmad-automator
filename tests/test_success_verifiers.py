@@ -12,6 +12,7 @@ from unittest.mock import patch
 from story_automator.commands.orchestrator import cmd_orchestrator_helper
 from story_automator.commands.state import cmd_build_state_doc
 from story_automator.commands.tmux import _verify_monitor_completion, cmd_monitor_session
+from story_automator.core.tmux_runtime import session_paths
 from story_automator.commands.validate_story_creation import cmd_validate_story_creation
 from story_automator.core.review_verify import verify_code_review_completion
 from story_automator.core.runtime_policy import PolicyError
@@ -268,6 +269,36 @@ class SuccessVerifierTests(unittest.TestCase):
             code = cmd_monitor_session(["fake-session", "--json", "--max-polls", "1"])
         self.assertEqual(code, 0)
         self.assertFalse(session_status_mock.call_args.kwargs["codex"])
+
+    def test_monitor_session_json_reports_malformed_session_state_when_session_gone(self) -> None:
+        session = "sa-test-session"
+        paths = session_paths(session, self.project_root)
+        paths.state.parent.mkdir(parents=True, exist_ok=True)
+        paths.state.write_text("{bad json", encoding="utf-8")
+        stdout = io.StringIO()
+        with patch_env(self.project_root), patch(
+            "story_automator.commands.tmux.session_status",
+            return_value={"active_task": "", "todos_done": 0, "todos_total": 0, "wait_estimate": 0, "session_state": "not_found"},
+        ), redirect_stdout(stdout):
+            code = cmd_monitor_session([session, "--json", "--max-polls", "1"])
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["final_state"], "not_found")
+        self.assertEqual(payload["structuredIssues"][0]["type"], "session_state.invalid_json")
+
+    def test_monitor_session_csv_does_not_include_structured_issues(self) -> None:
+        session = "sa-test-session"
+        paths = session_paths(session, self.project_root)
+        paths.state.parent.mkdir(parents=True, exist_ok=True)
+        paths.state.write_text("{bad json", encoding="utf-8")
+        stdout = io.StringIO()
+        with patch_env(self.project_root), patch(
+            "story_automator.commands.tmux.session_status",
+            return_value={"active_task": "", "todos_done": 0, "todos_total": 0, "wait_estimate": 0, "session_state": "not_found"},
+        ), redirect_stdout(stdout):
+            code = cmd_monitor_session([session, "--max-polls", "1"])
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout.getvalue().strip(), "not_found,0,0,,session_gone")
 
     def test_monitor_dispatch_allows_session_exit_without_story_key(self) -> None:
         result = _verify_monitor_completion(
