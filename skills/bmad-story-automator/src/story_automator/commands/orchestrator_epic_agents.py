@@ -243,10 +243,11 @@ def resolve_agent(config: dict, level: str, task: str) -> tuple[str, str, str]:
             primary = entry.get("primary", primary)
             if "fallback" in entry:
                 fallback = "false" if entry["fallback"] in {False, "false", "none", "null"} else entry["fallback"]
+            # `"model" in entry` distinguishes "key absent" (inherit default)
+            # from "key present with sentinel" ("" after normalization → clear
+            # the inherited defaultModel, the documented opt-out behavior).
             if "model" in entry:
-                resolved_model = _normalize_model_value(entry.get("model"))
-                if resolved_model:
-                    model = resolved_model
+                model = _normalize_model_value(entry.get("model"))
     level_map = config["complexityOverrides"].get(level, {})
     if not isinstance(level_map, dict):
         level_map = {}
@@ -257,9 +258,7 @@ def resolve_agent(config: dict, level: str, task: str) -> tuple[str, str, str]:
             if "fallback" in entry:
                 fallback = "false" if entry["fallback"] in {False, "false", "none", "null"} else entry["fallback"]
             if "model" in entry:
-                resolved_model = _normalize_model_value(entry.get("model"))
-                if resolved_model:
-                    model = resolved_model
+                model = _normalize_model_value(entry.get("model"))
     return (_resolve_primary_agent(primary), _resolve_fallback_agent(fallback), model)
 
 

@@ -101,6 +101,77 @@ class CoreAgentConfigModelTests(unittest.TestCase):
         _, _, model = resolve_agent_for_task(config, "medium", "dev")
         self.assertEqual(model, "claude-opus-4-7[1m]")
 
+    def test_explicit_sentinel_clears_inherited_default_model(self) -> None:
+        """Per-task `model: "none"` (or any sentinel) must opt that task out of
+        the global `defaultModel`. Repro from bma-d's review of e46ad63:
+        `{"defaultModel":"claude-opus-4-7[1m]",
+          "perTask":{"dev":{"primary":"claude","model":"none"}}}`
+        should resolve `dev` model to "" (no --model flag), not inherit.
+        """
+        config = parse_agent_config_json(
+            json.dumps(
+                {
+                    "defaultPrimary": "claude",
+                    "defaultModel": "claude-opus-4-7[1m]",
+                    "perTask": {
+                        "dev": {"primary": "claude", "fallback": False, "model": "none"},
+                        # No model key on `review` → must inherit defaultModel
+                        "review": {"primary": "claude", "fallback": False},
+                    },
+                }
+            )
+        )
+        _, _, dev_model = resolve_agent_for_task(config, "medium", "dev")
+        self.assertEqual(dev_model, "", "explicit `model: none` must clear the inherited default")
+        _, _, review_model = resolve_agent_for_task(config, "medium", "review")
+        self.assertEqual(review_model, "claude-opus-4-7[1m]", "absent `model` key must inherit defaultModel")
+        # And `create` / `auto` (no per-task entry at all) also inherit
+        _, _, create_model = resolve_agent_for_task(config, "medium", "create")
+        self.assertEqual(create_model, "claude-opus-4-7[1m]")
+
+    def test_complexity_override_sentinel_clears_inherited_model(self) -> None:
+        """`complexityOverrides[level][task].model: "auto"` overrides any
+        defaultModel / perTask model with the CLI default."""
+        config = parse_agent_config_json(
+            json.dumps(
+                {
+                    "defaultModel": "claude-opus-4-7[1m]",
+                    "perTask": {
+                        "review": {"primary": "claude", "model": "claude-opus-4-7"},
+                    },
+                    "complexityOverrides": {
+                        "high": {"review": {"primary": "claude", "model": "auto"}},
+                    },
+                }
+            )
+        )
+        _, _, model = resolve_agent_for_task(config, "high", "review")
+        self.assertEqual(model, "", "explicit sentinel at complexity-override layer must clear the model")
+        _, _, model = resolve_agent_for_task(config, "medium", "review")
+        self.assertEqual(model, "claude-opus-4-7", "medium-complexity review still uses perTask model")
+
+    def test_orchestrator_resolve_agent_sentinel_clears_default(self) -> None:
+        """Parallel path: commands/orchestrator_epic_agents.resolve_agent must
+        honor the same opt-out semantics so `agents-resolve` returns "" for
+        `model: none` even when `defaultModel` is configured.
+        """
+        config = parse_agent_config(
+            json.dumps(
+                {
+                    "defaultPrimary": "claude",
+                    "defaultModel": "claude-opus-4-7[1m]",
+                    "perTask": {
+                        "dev": {"primary": "claude", "fallback": False, "model": "none"},
+                        "review": {"primary": "claude", "fallback": False},
+                    },
+                }
+            )
+        )
+        _primary, _fallback, dev_model = resolve_agent(config, "medium", "dev")
+        self.assertEqual(dev_model, "")
+        _primary, _fallback, review_model = resolve_agent(config, "medium", "review")
+        self.assertEqual(review_model, "claude-opus-4-7[1m]")
+
     def test_model_sentinel_values_treated_as_unset(self) -> None:
         for sentinel in ("auto", "default", "false", "none", "null", ""):
             config = parse_agent_config_json(

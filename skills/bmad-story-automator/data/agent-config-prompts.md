@@ -203,5 +203,7 @@ selects a specific model ID for that task (passed via `--model` to the CLI).
 (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-opus-4-7[1m]`, `gpt-5.3-codex`).
 Leave model empty (or pass `auto` / `default` / `false` / `none` / `null`) to use the CLI's built-in default. All of these sentinels are treated as unset and omitted from the persisted state.
 
+A per-task `model: <sentinel>` is the explicit opt-out: it clears any inherited `defaultModel` for that task, so the spawned CLI runs without `--model`. Omit the `model` key entirely if you want the task to inherit `defaultModel`.
+
 Enter overrides (comma-separated):
 ```

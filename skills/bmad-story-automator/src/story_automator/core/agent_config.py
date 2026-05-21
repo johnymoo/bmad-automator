@@ -15,7 +15,11 @@ from .runtime_layout import runtime_provider
 class AgentTaskConfig:
     primary: str = ""
     fallback: Any = None
-    model: str = ""
+    # Three-state field: `None` = key not provided (inherit defaultModel);
+    # `""`   = key present but normalized to a sentinel (explicit "use CLI
+    #          default" — must CLEAR an inherited defaultModel);
+    # `<id>` = explicit model override.
+    model: str | None = None
 
 
 @dataclass
@@ -84,10 +88,17 @@ def _parse_task_map(raw: Any) -> dict[str, AgentTaskConfig]:
 def _parse_task_entry(raw: Any) -> AgentTaskConfig | None:
     if not isinstance(raw, dict):
         return None
+    # Distinguish "model key absent" (None → inherit) from "model key present
+    # but a sentinel/empty value" ("" → explicit clear of inherited default).
+    model: str | None
+    if "model" in raw:
+        model = _normalize_model(raw.get("model"))
+    else:
+        model = None
     return AgentTaskConfig(
         primary=str(raw.get("primary", "")),
         fallback=raw.get("fallback"),
-        model=_normalize_model(raw.get("model")),
+        model=model,
     )
 
 
@@ -123,7 +134,9 @@ def resolve_agent_for_task(config: AgentConfigResolved, complexity: str, task: s
             primary = per_task.primary
         if per_task.fallback is not None:
             fallback = normalize_fallback_value(per_task.fallback)
-        if per_task.model:
+        # `is not None` so an explicit sentinel ("" after _normalize_model)
+        # clears an inherited defaultModel — the documented opt-out semantics.
+        if per_task.model is not None:
             model = per_task.model
     by_level = config.complexity_overrides.get(complexity, {})
     override = by_level.get(task)
@@ -132,7 +145,7 @@ def resolve_agent_for_task(config: AgentConfigResolved, complexity: str, task: s
             primary = override.primary
         if override.fallback is not None:
             fallback = normalize_fallback_value(override.fallback)
-        if override.model:
+        if override.model is not None:
             model = override.model
     return _resolve_primary_agent(primary), _resolve_fallback_agent(fallback), model
 
