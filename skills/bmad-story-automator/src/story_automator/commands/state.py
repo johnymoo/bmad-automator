@@ -7,22 +7,8 @@ from typing import Any
 
 from ..core.frontmatter import extract_frontmatter, parse_simple_frontmatter
 from ..core.runtime_policy import PolicyError, load_policy_for_state, snapshot_effective_policy
+from ..core.agent_config import normalize_model as _model_or_none
 from ..core.utils import count_matches, ensure_dir, file_exists, get_project_root, now_utc, now_utc_z, read_text, write_json
-
-
-_MODEL_SENTINELS = {"", "auto", "default", "false", "none", "null"}
-
-
-def _model_or_none(raw: Any) -> str:
-    """Return a normalized model ID, or '' for any sentinel / non-string value."""
-    if raw is None or raw is False:
-        return ""
-    if not isinstance(raw, str):
-        return ""
-    value = raw.strip()
-    if value.lower() in _MODEL_SENTINELS:
-        return ""
-    return value
 
 
 def cmd_build_state_doc(args: list[str]) -> int:

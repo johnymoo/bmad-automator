@@ -262,15 +262,9 @@ def resolve_agent(config: dict, level: str, task: str) -> tuple[str, str, str]:
     return (_resolve_primary_agent(primary), _resolve_fallback_agent(fallback), model)
 
 
-def _normalize_model_value(raw: object) -> str:
-    if raw is None or raw is False:
-        return ""
-    value = str(raw).strip()
-    if not value:
-        return ""
-    if value.lower() in {"false", "none", "null", "auto", "default"}:
-        return ""
-    return value
+# Delegate to the canonical normalizer in core.agent_config so the sentinel
+# set is defined in exactly one place.
+from story_automator.core.agent_config import normalize_model as _normalize_model_value  # noqa: E402
 
 
 def _resolve_primary_agent(raw: object) -> str:

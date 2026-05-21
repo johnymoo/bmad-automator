@@ -102,15 +102,30 @@ def _parse_task_entry(raw: Any) -> AgentTaskConfig | None:
     )
 
 
-def _normalize_model(raw: Any) -> str:
+# Tokens that mean "use the CLI's built-in default" — never persisted, never
+# forwarded as `--model`. Kept in one place (`MODEL_SENTINELS` /
+# `normalize_model`) so every layer agrees on what counts as an opt-out.
+MODEL_SENTINELS = frozenset({"false", "none", "null", "auto", "default"})
+
+
+def normalize_model(raw: Any) -> str:
+    """Return a real model ID, or `""` for any sentinel / falsy / non-string.
+
+    Used by every consumer (config parser, dict resolver, state serializer)
+    so the sentinel set stays in lock-step across layers.
+    """
     if raw is None or raw is False:
         return ""
     value = str(raw).strip()
     if not value:
         return ""
-    if value.lower() in {"false", "none", "null", "auto", "default"}:
+    if value.lower() in MODEL_SENTINELS:
         return ""
     return value
+
+
+# Backward-compatible private alias for in-module callers.
+_normalize_model = normalize_model
 
 
 def normalize_fallback_value(raw: Any) -> str:
