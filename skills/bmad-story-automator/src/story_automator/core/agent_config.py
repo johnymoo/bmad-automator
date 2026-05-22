@@ -86,7 +86,10 @@ def parse_agent_config_json(raw: str) -> AgentConfigResolved:
 
 
 def load_agent_config_from_state(state_file: str | Path) -> AgentConfigResolved:
-    return parse_agent_config_frontmatter(extract_frontmatter(read_text(state_file)))
+    text = read_text(state_file)
+    if text.startswith("---") and len(text.split("---", 2)) < 3:
+        raise ValueError("state frontmatter is unterminated")
+    return parse_agent_config_frontmatter(extract_frontmatter(text))
 
 
 def parse_agent_config_frontmatter(frontmatter: str) -> AgentConfigResolved:
@@ -148,11 +151,11 @@ def extract_agent_config_frontmatter(frontmatter: str) -> dict[str, object]:
                 continue
             if ":" in stripped:
                 key, raw = stripped.split(":", 1)
-                config[key.strip()] = _parse_scalar(raw)
+                config[_parse_key(key)] = _parse_scalar(raw)
             continue
 
         if indent == 4 and in_per_task and stripped.endswith(":"):
-            current_task = stripped[:-1]
+            current_task = _parse_key(stripped[:-1])
             per_task = config.setdefault("perTask", {})
             if isinstance(per_task, dict):
                 per_task.setdefault(current_task, {})
@@ -160,7 +163,7 @@ def extract_agent_config_frontmatter(frontmatter: str) -> dict[str, object]:
 
         if indent == 4 and in_complexity_overrides and ":" in stripped:
             key, raw = stripped.split(":", 1)
-            current_level = key.strip()
+            current_level = _parse_key(key)
             current_task = ""
             overrides = config.setdefault("complexityOverrides", {})
             if isinstance(overrides, dict):
@@ -177,7 +180,7 @@ def extract_agent_config_frontmatter(frontmatter: str) -> dict[str, object]:
             key, raw = stripped.split(":", 1)
             retro = config.setdefault("retro", {})
             if isinstance(retro, dict):
-                retro[key.strip()] = _parse_scalar(raw.strip())
+                retro[_parse_key(key)] = _parse_scalar(raw.strip())
             continue
 
         if indent == 6 and in_per_task and current_task and ":" in stripped:
@@ -186,7 +189,7 @@ def extract_agent_config_frontmatter(frontmatter: str) -> dict[str, object]:
             if isinstance(per_task, dict):
                 task_cfg = per_task.setdefault(current_task, {})
                 if isinstance(task_cfg, dict):
-                    task_cfg[key.strip()] = _parse_scalar(raw.strip())
+                    task_cfg[_parse_key(key)] = _parse_scalar(raw.strip())
             continue
 
         if indent == 6 and in_complexity_overrides and current_level and stripped.startswith("-"):
@@ -197,7 +200,7 @@ def extract_agent_config_frontmatter(frontmatter: str) -> dict[str, object]:
 
         if indent == 6 and in_complexity_overrides and current_level and ":" in stripped:
             key, raw = stripped.split(":", 1)
-            current_task = key.strip()
+            current_task = _parse_key(key)
             overrides = config.setdefault("complexityOverrides", {})
             if isinstance(overrides, dict):
                 level_cfg = overrides.setdefault(current_level, {})
@@ -224,7 +227,7 @@ def extract_agent_config_frontmatter(frontmatter: str) -> dict[str, object]:
                 if isinstance(level_cfg, dict):
                     task_cfg = level_cfg.setdefault(current_task, {})
                     if isinstance(task_cfg, dict):
-                        task_cfg[key.strip()] = _parse_scalar(raw.strip())
+                        task_cfg[_parse_key(key)] = _parse_scalar(raw.strip())
             continue
 
         if in_complexity_overrides and indent > 2:
@@ -464,6 +467,10 @@ def _parse_scalar(raw: str) -> object:
     if lower == "true":
         return True
     return value
+
+
+def _parse_key(raw: str) -> str:
+    return unquote_scalar(raw.strip())
 
 
 def _has_scalar_value(raw: str) -> bool:
