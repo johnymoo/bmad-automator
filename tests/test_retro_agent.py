@@ -290,6 +290,7 @@ class RetroAgentTests(unittest.TestCase):
             "---\nagentConfig:\n  complexityOverrides:\n    - medium:\n        retro:\n          primary: \"codex\"\n---\n",
             "---\nagentConfig:\n  complexityOverrides:\n    medium:\n     retro:\n        primary: \"codex\"\n---\n",
             "---\nagentConfig:\n  defaultPrimary: \"claude\"\n    complexityOverrides:\n      medium:\n        retro:\n          primary: \"codex\"\n---\n",
+            "---\nagentConfig: bad\n  complexityOverrides:\n    medium:\n      retro:\n        primary: \"codex\"\n---\n",
         )
         for index, content in enumerate(cases):
             with self.subTest(index=index):
@@ -303,7 +304,7 @@ class RetroAgentTests(unittest.TestCase):
                 payload = json.loads(stdout.getvalue())
                 self.assertEqual(code, 1)
                 self.assertEqual(payload["error"], "invalid_agent_config")
-                self.assertIn("complexityOverrides", payload["structuredIssues"][0]["message"])
+                self.assertRegex(payload["structuredIssues"][0]["message"], r"agentConfig|complexityOverrides")
 
     def test_retro_agent_rejects_unterminated_frontmatter(self) -> None:
         state_file = self.project_root / "retro-unterminated-state.md"
