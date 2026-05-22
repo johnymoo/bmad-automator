@@ -88,9 +88,10 @@ def agent_type() -> str:
 def agent_cli(agent: str, model: str = "") -> str:
     model = (model or "").strip()
     if agent == "codex":
-        base = "codex exec"
+        codex_bin = os.environ.get("CODEX_BIN", "codex")
+        base = f"{codex_bin} exec"
     else:
-        base = "claude --dangerously-skip-permissions"
+        base = "claude --dangerously-skip-permissions --strict-mcp-config"
     if model:
         base = f"{base} --model {shlex.quote(model)}"
     return base
@@ -753,7 +754,7 @@ def _claude_completion_marker_present(capture: str) -> bool:
         return False
     return bool(
         re.search(
-            r"(?im)(?:^|✻\s+)(?:\w+ed|Done)\s+for\s+\d+m(?:\s+\d+s)?\b",
+            r"(?im)\b(?:Baked|Done|Finished)\s+for\s+\d+m(?:\s+\d+s)?\b",
             capture,
         )
     )

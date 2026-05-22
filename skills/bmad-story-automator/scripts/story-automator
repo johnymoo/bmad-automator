@@ -7,4 +7,9 @@ WORKFLOW_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 export PYTHONPATH="$WORKFLOW_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
-exec python3 -m story_automator "$@"
+VENV_PYTHON="$HOME/.venvs/story-automator/bin/python"
+if [ -x "$VENV_PYTHON" ]; then
+  exec "$VENV_PYTHON" -m story_automator "$@"
+else
+  exec python3 -m story_automator "$@"
+fi

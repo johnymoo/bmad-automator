@@ -200,21 +200,25 @@ def _build_cmd(args: list[str]) -> int:
         print(str(exc), file=__import__("sys").stderr)
         return 1
     ai_command = os.environ.get("AI_COMMAND", "").strip()
-    if ai_command and not os.environ.get("AI_AGENT"):
+    _agent_env = os.environ.get("AI_AGENT", "").strip().lower()
+    if ai_command and _agent_env not in {"claude", "codex"}:
         cli = ai_command
     elif agent != "codex":
         cli = agent_cli(agent, model)
     else:
-        cli = "codex exec"
+        cli = agent_cli("codex")
     quoted_prompt = shlex.quote(prompt)
     if agent == "codex" and not ai_command:
-        codex_home = f"/tmp/sa-codex-home-{project_hash(root)}"
+        codex_bin = os.environ.get("CODEX_BIN", "codex")
+        codex_home = os.path.expanduser(f"~/.cache/sa-codex-home-{project_hash(root)}")
         auth_src = os.path.expanduser("~/.codex/auth.json")
+        config_src = os.path.expanduser("~/.codex/config.toml")
         model_flag = f" --model {shlex.quote(model)}" if model else ""
         print(
             f'mkdir -p "{codex_home}"'
             + f' && if [ -f "{auth_src}" ]; then ln -sf "{auth_src}" "{codex_home}/auth.json"; fi'
-            + f' && CODEX_HOME="{codex_home}" codex exec -s workspace-write -c \'approval_policy="never"\''
+            + f' && if [ -f "{config_src}" ]; then ln -sf "{config_src}" "{codex_home}/config.toml"; fi'
+            + f' && CODEX_HOME="{codex_home}" {codex_bin} exec -s workspace-write -c \'approval_policy="never"\''
             + f' -c \'model_reasoning_effort="high"\'{model_flag}'
             + f" --disable plugins --disable sqlite --disable shell_snapshot {quoted_prompt}"
         )
