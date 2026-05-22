@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from story_automator.core.agent_config import AgentConfigResolved, build_agents_file, load_agent_config_from_state, parse_agent_config_json, resolve_agent_for_task, resolve_agents_payload
+from story_automator.core.agent_config import AgentConfigResolved, AgentPlanInputError, build_agents_file, load_agent_config_from_state, parse_agent_config_json, resolve_agent_for_task, resolve_agents_payload
 from story_automator.core.agent_plan import agent_plan_error, load_agents_plan_for_resolution, load_complexity_payload
 from story_automator.core.diagnostics import issues_from_exception
 from story_automator.core.frontmatter import find_frontmatter_value, parse_frontmatter
@@ -121,6 +121,10 @@ def agents_build_action(args: list[str]) -> int:
         return 1
     try:
         payload = build_agents_file(options["state-file"], options["complexity-file"], options["output"], options["config-json"])
+    except AgentPlanInputError as exc:
+        cause = exc.__cause__ if isinstance(exc.__cause__, Exception) else exc
+        print_json(agent_plan_error("invalid_agent_config", issues_from_exception(cause, source="agent-plan", field=exc.field)))
+        return 1
     except (json.JSONDecodeError, OSError, ValueError) as exc:
         print_json(agent_plan_error("invalid_agent_config", issues_from_exception(exc, source="agent-plan", field="config-json")))
         return 1
