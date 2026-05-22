@@ -4,11 +4,10 @@ import json
 import re
 from pathlib import Path
 
-from story_automator.core.agent_config import build_agents_file, resolve_agents
-from story_automator.core.agent_plan import agent_plan_error, load_agents_plan, load_complexity_payload
+from story_automator.core.agent_config import AgentConfigResolved, build_agents_file, parse_agent_config_json, resolve_agent_for_task, resolve_agents
+from story_automator.core.agent_plan import agent_plan_error, load_agents_plan_for_resolution, load_complexity_payload
 from story_automator.core.diagnostics import issues_from_exception
 from story_automator.core.frontmatter import extract_frontmatter, find_frontmatter_value, parse_frontmatter
-from story_automator.core.runtime_layout import runtime_provider
 from story_automator.core.sprint import sprint_status_epic
 from story_automator.core.story_keys import normalize_story_key
 from story_automator.core.utils import file_exists, get_project_root, print_json, read_text, trim_lines, unquote_scalar
@@ -146,7 +145,7 @@ def agents_resolve_action(args: list[str]) -> int:
     if not agents_path or not file_exists(agents_path):
         print_json({"ok": False, "error": "agents_file_not_found"})
         return 1
-    _, issues = load_agents_plan(agents_path)
+    _, issues = load_agents_plan_for_resolution(agents_path, options["story"], options["task"])
     if issues:
         print_json(agent_plan_error("invalid_agents_json", issues))
         return 1
@@ -172,7 +171,7 @@ def retro_agent_action(args: list[str]) -> int:
         print_json({"ok": False, "error": "file_not_found"})
         return 1
     config = _load_agent_config_from_state(options["state-file"])
-    primary, fallback = resolve_agent(config, "medium", "retro")
+    primary, fallback = resolve_agent_for_task(config, "medium", "retro")
     print_json({"ok": True, "task": "retro", "primary": primary, "fallback": fallback})
     return 0
 
@@ -187,70 +186,32 @@ def find_epic_file(epic: str) -> str:
 
 
 def parse_agent_config(raw: str) -> dict:
-    data = json.loads(raw)
-    per_task = data.get("perTask", {})
-    if not isinstance(per_task, dict):
-        per_task = {}
-    retro = data.get("retro")
-    if isinstance(retro, dict) and "retro" not in per_task:
-        per_task = {**per_task, "retro": retro}
-    complexity_overrides = data.get("complexityOverrides")
-    if not isinstance(complexity_overrides, dict):
-        complexity_overrides = {level: data[level] for level in ("low", "medium", "high") if isinstance(data.get(level), dict)}
-    if "defaultFallback" in data:
-        fallback_raw = data.get("defaultFallback")
-    elif "fallback" in data:
-        fallback_raw = data.get("fallback")
-    else:
-        fallback_raw = False
+    config = parse_agent_config_json(raw)
     return {
-        "defaultPrimary": data.get("defaultPrimary") or data.get("primary") or "auto",
-        "defaultFallback": "false" if fallback_raw in {False, "false", "none", "null"} else (fallback_raw or "false"),
-        "perTask": per_task,
-        "complexityOverrides": complexity_overrides,
+        "defaultPrimary": config.default_primary,
+        "defaultFallback": config.default_fallback,
+        "perTask": {
+            task: {"primary": task_config.primary, "fallback": task_config.fallback}
+            for task, task_config in config.per_task.items()
+        },
+        "complexityOverrides": {
+            level: {
+                task: {"primary": task_config.primary, "fallback": task_config.fallback}
+                for task, task_config in task_map.items()
+            }
+            for level, task_map in config.complexity_overrides.items()
+        },
     }
 
 
 def resolve_agent(config: dict, level: str, task: str) -> tuple[str, str]:
-    primary = config["defaultPrimary"]
-    fallback = config["defaultFallback"]
-    if task in config["perTask"]:
-        entry = config["perTask"][task]
-        if isinstance(entry, dict):
-            primary = entry.get("primary", primary)
-            if "fallback" in entry:
-                fallback = "false" if entry["fallback"] in {False, "false", "none", "null"} else entry["fallback"]
-    level_map = config["complexityOverrides"].get(level, {})
-    if not isinstance(level_map, dict):
-        level_map = {}
-    if task in level_map:
-        entry = level_map[task]
-        if isinstance(entry, dict):
-            primary = entry.get("primary", primary)
-            if "fallback" in entry:
-                fallback = "false" if entry["fallback"] in {False, "false", "none", "null"} else entry["fallback"]
-    return (_resolve_primary_agent(primary), _resolve_fallback_agent(fallback))
+    return resolve_agent_for_task(_legacy_config_to_core(config), level, task)
 
 
-def _resolve_primary_agent(raw: object) -> str:
-    value = str(raw or "").strip().lower()
-    if value in {"", "auto", "runtime"}:
-        return runtime_provider()
-    return value
-
-
-def _resolve_fallback_agent(raw: object) -> str:
-    value = "false" if raw is False else str(raw or "")
-    normalized = value.strip().lower()
-    if normalized in {"", "auto", "runtime", "false", "none", "null"}:
-        return "false"
-    return normalized
-
-
-def _load_agent_config_from_state(state_file: str) -> dict:
+def _load_agent_config_from_state(state_file: str) -> AgentConfigResolved:
     text = extract_frontmatter(read_text(state_file))
     if not text:
-        return parse_agent_config("{}")
+        return parse_agent_config_json("{}")
 
     config: dict[str, object] = {}
     in_agent_config = False
@@ -345,7 +306,20 @@ def _load_agent_config_from_state(state_file: str) -> dict:
                     if isinstance(task_cfg, dict):
                         task_cfg[key.strip()] = _parse_scalar(raw.strip())
 
-    return parse_agent_config(json.dumps(config))
+    return parse_agent_config_json(json.dumps(config))
+
+
+def _legacy_config_to_core(config: dict) -> AgentConfigResolved:
+    return parse_agent_config_json(
+        json.dumps(
+            {
+                "defaultPrimary": config.get("defaultPrimary", "auto"),
+                "defaultFallback": config.get("defaultFallback", "false"),
+                "perTask": config.get("perTask", {}),
+                "complexityOverrides": config.get("complexityOverrides", {}),
+            }
+        )
+    )
 
 
 def _parse_scalar(raw: str) -> object:
