@@ -170,7 +170,11 @@ def retro_agent_action(args: list[str]) -> int:
     if not file_exists(options["state-file"]):
         print_json({"ok": False, "error": "file_not_found"})
         return 1
-    config = _load_agent_config_from_state(options["state-file"])
+    try:
+        config = _load_agent_config_from_state(options["state-file"])
+    except (json.JSONDecodeError, OSError, ValueError) as exc:
+        print_json(agent_plan_error("invalid_agent_config", issues_from_exception(exc, source="agent-plan", field="state-file")))
+        return 1
     primary, fallback = resolve_agent_for_task(config, "medium", "retro")
     print_json({"ok": True, "task": "retro", "primary": primary, "fallback": fallback})
     return 0
