@@ -86,7 +86,10 @@ def agent_type() -> str:
 
 
 def agent_cli(agent: str) -> str:
-    return "codex exec" if agent == "codex" else "claude --dangerously-skip-permissions"
+    if agent == "codex":
+        codex_bin = os.environ.get("CODEX_BIN", "codex")
+        return f"{codex_bin} exec"
+    return "claude --dangerously-skip-permissions --strict-mcp-config"
 
 
 def skill_prefix(agent: str) -> str:
@@ -746,7 +749,7 @@ def _claude_completion_marker_present(capture: str) -> bool:
         return False
     return bool(
         re.search(
-            r"(?im)(?:^|✻\s+)(?:\w+ed|Done)\s+for\s+\d+m(?:\s+\d+s)?\b",
+            r"(?im)\b(?:Baked|Done|Finished)\s+for\s+\d+m(?:\s+\d+s)?\b",
             capture,
         )
     )
