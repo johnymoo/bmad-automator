@@ -103,10 +103,13 @@ def parse_agent_config_frontmatter(frontmatter: str) -> AgentConfigResolved:
 
 
 def has_agent_config_runtime_source(frontmatter: str) -> bool:
-    config = extract_agent_config_frontmatter(frontmatter)
+    try:
+        config = extract_agent_config_frontmatter(frontmatter)
+    except ValueError:
+        return False
     for key in ("defaultPrimary", "primary", "defaultFallback", "fallback"):
         value = config.get(key)
-        if value not in ("", [], None):
+        if value not in ("", [], {}, None):
             return True
     for key in ("perTask", "complexityOverrides", "retro"):
         if key in config:
@@ -255,3 +258,35 @@ def _resolve_fallback_agent(raw: Any) -> str:
     if normalized in {"", "auto", "runtime"}:
         return "false"
     return normalized
+
+
+def extract_json_block(text: str) -> str:
+    from .frontmatter import extract_json_block as _extract_json_block
+
+    return _extract_json_block(text)
+
+
+def build_agents_file(state_file: str | Path, complexity_file: str | Path, output_path: str | Path, config_json: str) -> dict[str, Any]:
+    from .agent_plan import build_agents_file as _build_agents_file
+
+    return _build_agents_file(state_file, complexity_file, output_path, config_json)
+
+
+def resolve_agents(agents_file: str | Path, story_id: str, task: str) -> dict[str, Any]:
+    from .agent_plan import resolve_agents as _resolve_agents
+
+    return _resolve_agents(agents_file, story_id, task)
+
+
+def resolve_agents_payload(payload: dict[str, Any], story_id: str, task: str) -> dict[str, Any]:
+    from .agent_plan import resolve_agents_payload as _resolve_agents_payload
+
+    return _resolve_agents_payload(payload, story_id, task)
+
+
+def __getattr__(name: str) -> Any:
+    if name == "AgentPlanInputError":
+        from .agent_plan import AgentPlanInputError
+
+        return AgentPlanInputError
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
